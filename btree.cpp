@@ -125,11 +125,12 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 }
 bool BTree::isLeaf (int recAddr)
 {
-	return false;
+	BTNode n = getNode(recAddr);
+	return isLeaf(n);
 }
 bool BTree::isLeaf(BTNode t)
 {
-	return false;
+	return t.child[0] == -1 ? true : false;
 }
 int BTree::countLeaves(int recAddr)
 {
