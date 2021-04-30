@@ -1,0 +1,330 @@
+//Baby Readme file for Album class
+
+//below is the album.h file//
+
+const int UpTo = 50;
+typedef char String[UpTo];
+
+class Album
+{
+   public :
+       Album (const Album& otherAlbum);
+       Album (String upc, String artist,
+                String title);
+       Album ();
+       Album & operator = (const Album& otherAlbum);
+       friend bool operator < (const Album& a, const Album& b);
+       friend istream & operator >> (istream & stream, Album & C);
+       friend ostream & operator << (ostream & stream, Album & C);
+       string getUPC ();
+       int recordSize();
+   private :
+       String UPC, Artist, Title;
+};
+
+3 constructors:
+	1. Constructor that reads in an album and sets the new album's values
+	to those of the album that's being read in.
+
+	2. Constructor that reads in the UPC, Artist, and Title values to fill
+	the values for our album.
+
+	3. Default constructor that doesn't instantiate anything for our album.
+
+Operator overloading:
+	1. Overload = operator: sets the contents of the album to the left of the
+	equal sign to contents of the album on the right of the equal sign.
+	
+	2. Overload < operator: returns a boolean from comparing the UPC values
+	of the album on the left and the right side of the less than sign.
+
+	3. Overload cin operator: reads in an Album class 
+	4. Overload cout operator: prints out an Album class
+
+Other stuff:
+	1. getUPC method: returns the UPC value as a string object
+	2. Private variables:
+		a. UPC code (which is used as a key for each Album)
+		b. Artist name
+		c. Title of the album
+	3. recordSize method: returns the size (in bytes) of an Album record
+	To accomplish this, I turned all the character arrays for UPC, Artist, 
+	and Title to strings and added the length of all the strings together 
+	to get the total number of bytes in the Album, because each character
+	is a byte.
+///////////////////////////////////////////////////////////////////////////////
+
+//README for our B-tree class
+
+//below is the btree.h file//
+
+class Album;
+const int ORDER = 5;
+typedef Album keyType;
+typedef int IndexArray[ORDER];
+typedef keyType ValueArray[ORDER-1];
+
+struct BTNode
+{
+        int currSize;
+        ValueArray contents;
+        IndexArray child;
+};
+
+struct Pair
+{
+        Album element;
+        int loffset;
+        int roffset;
+        friend bool operator < (const Pair& p1, const Pair& p2)
+           { return (p1.element < p2.element);  }
+};
+
+
+struct explanations:
+	1. BTNode struct:
+		a. int currSize: this holds the number of actual Albums being stored in the node.
+		b. ValueArray contents: contains the actual elements of the node (up to m-1 elements);
+		the ValueArray contains Albums, which are sorted by their UPC number.
+		c. IndexArray child: contains the addresses of the links/children of the node (m links)
+
+	2. Pair struct:
+		-used when we're actually splitting a node.
+		a. Album element: holds the Album element
+		b. int loffset: holds the left child of an Album element being held in a node; if there
+		is no child, then this will be 0. If there is a child, then this will hold the address of
+		the BTNode of the child.
+		c. int roffset: holds the right child of an Album element being held in a node; if there
+		is no child, then this value will be 0. If there is a child, then this value will hold
+		the address of the BTNode of the child.
+
+Important algorithm - Splitting a node
+	void insert (keyType key, int recAddr, int oneAddr, int twoAddr);	
+	void splitNode (keyType& key,int recAddr,int& oneAddr,int& twoAddr);
+
+
+	When inserting elements to a BTree, we have to split a node when we attempt to add more elements 
+	than the node can actually hold. Here, since our order is 5 for the BTree, we can hold up to 4 
+	elements in a single node, and each node can have up to 5 children. This means that the greatest 
+	currSize for BTNode is 4. This currSize value will help us determine if we need to split a node 
+	or not.
+
+	So, let's say that we have the following in the root of a BTree. 
+	The values in the root are the UPC numbers for their respective Album objects:
+	currSize: 4
+	Value Array: 23 42 50 70
+	Index Array: -1 -1 -1 -1 -1
+
+	Let's say that we want to add an Album with a UPC = 52 to the node.
+
+	When inserting elements, we will have the following case:
+	if (currSize == 4)
+	{
+		splitNode(key, recAddr, oneAddr, twoAddr);
+	}
+	
+	Then in our splitNode function, we'll have to do something along these lines:
+	1. Create a node for the recAddr passed in.
+	BTNode node = getNode(recAddr);	
+
+	2. Add all the values in the ValueArray for the key to a set.
+	set<Album> s (node.contents, node.contents+currSize);
+	
+	3. Add the new key to our set
+	s.insert(key);
+
+	4. Then, iterate through the set to find the middleElement in the set.
+	This middle element will become the new parent, and we'll have to change
+	the address of oneAddr to be the address of this node. The middle of the 
+	set is based on the order. I chose not to hardcode this in case I decide 
+	to reuse this class with a different order b-tree in the future.
+
+	int middle = ORDER/2; //this is the index of the middle element
+	set<Album>::iterator it = s.begin();
+	
+	//This for loop goes through and sets the iterator to point to the 
+	//element in the middle of the set.
+	for (int i = 0; i <= middle; i++)
+		it+=1;
+	
+	Album parent = *it;
+	//this is where we update oneAddr to be the disk offset of the parent Album object
+	
+	//then, increment *it one more time to get the address of the sibling node
+	it+=1;
+	Album sibling = *it;
+	//this is where we update twoAddr to be the disk offset of the sibling Album object
+	
+	5. Finally, after updating oneAddr and twoAddr, we end the functoion; because this is
+	a void/non-value returning function, we don't add anything else and the program moves 
+	back up to the insert function to continue inserting a node to the B-tree.
+
+	To go back to the example I showed earlier, after doing all this we should have the 
+	address integer variables pointing to the following values in the nodes:
+	- oneAddr will point to the disk offset of the Album with the UPC of 50
+	- twoAddr will point to the disk offset of the Album with the UPC of 52
+
+	The B-tree, once everything is inserted correctly, will look like the following:
+	note: -1 denotes a null
+	
+	Value Array: 50 -1 -1 -1 
+	Index Array: recAddr twoAddr	
+
+
+	Another note: Since we are changing the root, we will also need to make a call to adjRoot 
+	(the method that adjusts the root) so that everything is properly updated and so that the 
+	rootAddr will equal oneAddr, the new address of the root.
+
+	Also, since we split the node, we will need to update the currSize of each node when we're
+	back in the insert function.
+
+
+Class methods/variables from btree.h:
+
+class BTree
+{
+ public:
+        BTree();
+        void writeHeader (char * fileName);
+		-write the header information 
+		-the header information consists of the following: 
+			child [0]: The address of the root node
+        void insert (keyType key);
+		-make a call to the private insert function from this public function
+        void reset (char * filename);
+		-this will reset our b-tree 
+        void close ();
+		-this closes the b-tree index file when we are done inserting values into it.
+		-this will be called at the end of the program.
+        void printTree();
+		-here, we will iterate through all the nodes in the tree and print them out 
+        	-this calls the private printTree method to print the tree; nothing is actually
+		done in this method besides calling the private printTree method. We pass the 
+		root address into the private printTree method.
+		-we could print the height of the tree before calling the private printTree method,
+		but none of the heavy lifting for printing is performed in this method.
+	void inorder();
+		-method to perform an inorder traversal of the tree; call the private version
+		of this method from the public version
+        void reverse();
+		-this calls the private version of the reverse function
+        int getHeight();
+		-method to find the height of the B-tree. We don't need to pass anything into this 
+		method because we will base everything off of the root node.
+		-traverse down a path until a leaf is reached, counting each node passed. 
+        bool search (string key);
+		-when given a UPC key for an album, the program will return a boolean representing 
+		if the Album can be found within the B-tree.
+        keyType retrieve (string key);
+		-when given a UPC key for an album, the program will 
+        void totalio() const;
+		-this method keeps track of the total reads and writes to our file
+		-this method will just print out the values stored in our private read/write integer
+		variables
+        int countLeaves();
+		-this is a value returning method that counts the number of leaves in our B-tree
+		-like the public/private printTree methods, the public method does not perform any of 
+		the heavy lifting; the public countLeaves just calls the private countLeaves and 
+		passes the root address in as the parameter to the private countLeaves method.
+ private:
+        BTNode root;
+		-this is a variable to store the header information, which includes info about the root node
+        int rootAddr;
+		-this is the address of the root node in RAM
+        char treeFileName[80];
+		-this is the name of the tree file
+        fstream treeFile;
+		-this is the filestream object used to read in the tree
+        int height;
+		-variable to hold the height of the tree
+        void printTree (int rootAddr);
+		-recursive method to print the preorder traversal of the tree
+		-this goes down every node, reads in the next child node (if it exists), and then
+		goes execute itself on the child node. It then prints out the record it's pointing at,
+		and then reads in the next child node. This process repeats until it has printed out all
+		of the records and traversed all of the child nodes.
+        void inorder (int rootAddr);
+		-perform an inorder traversal of the tree.
+        void reverse (int rootAddr);	
+		-this is called when we perform a split where the given node comes up to be 
+		a parent and the parent becomes a child
+        int read;
+		-used to count the number of reads from a file
+        int write;
+		-used to count the number of write to a file
+        int findAddr (keyType key, BTNode t, int tAddr);
+		-method to find the address on disk of a particular key
+        int findpAddr(keyType key, BTNode t, int tAddr);
+		-method to find the parent node of a particular node of a node
+		of the key we're adding would be found
+		-this is used when we're splitting a node
+        void insert (keyType key, int recAddr, int oneAddr, int twoAddr);
+		-this is the private version of the public insert function that actually
+		goes through and does the hard work of inserting a new key into the tree.
+		-start by going to the deepest level of the tree first; do htis by comparing
+		the record we want to insert to the records in the tree. If the tree have any 
+		children, we go to the one that is under the record that is greater than the 
+		record we want to insert. Else, check for node splitting. This will happen if 
+		the node is already at full capacity (since the order is 5, this means the 
+		currSize needs to be 4 for this to be at full capacity). We split the node
+		by pushing up the center value and then moving the records greater than the
+		center into the new sibling node.
+        BTNode getNode (int recAddr);
+		-this goes through and returns the BTNode when given the disk offset for
+		the record we're looking at.
+        void printNode(int recAddr);
+		-for printing a singular node
+		-this is called from our printTree method, when we are printing out
+		each node in a preoder traversal
+        	-this prints out each album in the ValueArray of the node with the address
+		held in recAddr 
+	void placeNode (keyType k,int recAddr,int oneAddr,int twoAddr);
+		-this method takes a node that was created and places it in the specified
+		address for the B-tree.
+        bool isLeaf (int recAddr);
+		-method that, when given the address of a record, will need to
+		call getNode to find the node associated with the given recAddr
+		-then, this method will make a call to the other isLeaf method
+		(while passing in the BTNode associated with the recAddr) to 
+		determine if we have a leaf node or not.
+        bool isLeaf(BTNode t);
+		-given a BTNode object, we determine if a node is a leaf
+		-we are able to tell if a node is a leaf if the first value of
+		its IndexArray is -1; this indicates that there are no children,
+		since this is not the address of a node, which means that we have
+		found a leaf.
+        int countLeaves(int recAddr);
+		-method that, when passed the root address, will go through its
+		children to determine how many leaves we actually have.
+		-there are multiple cases:
+        void adjRoot (keyType rootElem, int oneAddr, int twoAddr);
+		-for adjusting the root node
+		-this is called in the insert function after we split a node, if the 
+		root needs to be adjusted. The root will not always need to be adjusted
+		after splitting a node and reinserting the pieces into the B-tree.
+        	-adjusting the root means updating the header information in the root 
+		BTNode and the root address in rootAddr. 
+	void splitNode (keyType& key,int recAddr,int& oneAddr,int& twoAddr);
+		-for splitting the node when we have an excess number of values we are 
+		trying to add to a particular node. This happens when we attempt to add
+		a key to a node that is already at full capacity (aka, currSize == 4 for
+		a given BTNode).
+		-the full algorithm for this method was described above.
+        bool search (string key, BTNode t, int tAddr);
+		-we pass in the key we're looking for, the root node, and the address
+		of the root node so that we can traverse the tree and determine if the 
+		value that we want is in the tree or not
+		-searching is similar to searching a binary search tree
+
+};
+
+
+
+
+
+
+
+
+
+
+
