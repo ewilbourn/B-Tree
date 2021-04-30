@@ -33,7 +33,8 @@ void BTree::close ()
 //print preorder traversal of tree
 void BTree::printTree()
 {
-
+	cout << "-------- B-tree of height " << height << " --------" << endl;
+	printTree(rootAddr);
 }
 
 //print inorder traversal of tree
@@ -80,7 +81,13 @@ int BTree::countLeaves()
 //PRIVATE METHODS
 void BTree::printTree (int rootAddr)
 {
-
+	if (rootAddr != -1)
+        {
+                BTNode dummy = getNode(rootAddr);
+                printNode(rootAddr);
+                for (int i = 0;  i <= dummy.currSize;  i++)
+                        printTree(dummy.child[i]);
+        }
 }
 void BTree::inorder (int rootAddr)
 {
