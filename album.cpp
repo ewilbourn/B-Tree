@@ -65,6 +65,11 @@ ostream & operator << (ostream & stream, Album & C)
 	cout << C.UPC << "|" << C.Artist << "|" << C.Title;
 	return stream;	
 }
+
+bool operator == (const Album& a, const Album& b)
+{
+	return (a.UPC == b.UPC && a.Artist == b.Artist && a.Title == b.Title ? true : false)
+}
 //return the UPC (which is currently a c-string) as a std::string
 string Album::getUPC ()
 {
