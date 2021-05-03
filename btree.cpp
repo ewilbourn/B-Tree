@@ -1,5 +1,7 @@
 #include <algorithm> //used to sort array
 #include "btree.h"
+#include <set> //used in splitting the node
+#include <iterator> //std::advance; used in splitting node
 
 using namespace std;
 
@@ -126,6 +128,7 @@ void BTree::insert (keyType key, int recAddr, int oneAddr, int twoAddr)
 	//and after adding a new node, this will be full (at size ORDER-1)
 	if (n.currSize < (ORDER-2))	
 	{
+		cout << "INSERTING VALUE" << endl;
 		//add value to contents array, increment currSize, 
 		//and then sort contents
 		n.contents[n.currSize-1] = key;
@@ -214,7 +217,38 @@ void BTree::adjRoot (keyType rootElem, int oneAddr, int twoAddr)
 //method to split a node when we try to add a record to a full node
 void BTree::splitNode (keyType& key,int recAddr,int& oneAddr,int& twoAddr)
 {
+	cout << "SPLITTING NODE" << endl;
 
+	//create node for recAddr
+	BTNode n = getNode(recAddr);
+
+	//add all values in ValArray to a set
+	set<keyType> s (n.contents, n.contents+currSize);
+
+	//add new key to the set
+	s.insert(key);
+
+	//iterate through the set to find the middle element (the element that
+	//will ultimately be promoted)
+	int middle_index = (ORDER-1)/2;
+	set<keyType>::iterator it = s.begin();
+
+	//Use the advance method to move the iterator where we need it
+	//The advance moves the iterator to the position of the middle_index value,
+	//so if we start at index = 0, we want it to move middle_index-1 slots forward.
+	advance(it, middle_index-1);
+
+	//set the keyType parent equal to the element being promoted.
+	keyType parent = *it;
+	
+	//increment iterator one more time to get the elements that will be in right child
+	it+=1;
+	keyType right_child = *it;
+
+	//how to get parent node? - use the pAddr method...but how to write this??
+		
+
+	//NOW: Update oneAddr and twoAddr - which is the parent address and right child address respectively	
 }
 //method to search through the tree when given a transaction file 
 //initially -- pass in the string key (from the transaction file), root, and
