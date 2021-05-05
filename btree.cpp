@@ -2,7 +2,7 @@
 #include "btree.h"
 #include <set> //used in splitting the node
 #include <iterator> //std::advance; used in splitting node
-
+#include <fstream> //for file objects
 using namespace std;
 
 //default constructor
@@ -13,13 +13,21 @@ BTree::BTree()
 
 void BTree::writeHeader (char * fileName)
 {
+	//set the treeFile object
+	treeFile.open(fileName, ios::in);
 
+	//set file pointer to beginning of the file
+	treeFile.seekg(0, ios::beg);
+	
+	//define address of root node
+	rootAddr = tellg();	
 }
 
 //insert key into B-tree
 void BTree::insert (keyType key)
 {
-
+	int recAddr = treeFile.tellg();
+//	insert(key,
 }
 
 void BTree::reset (char * filename)
@@ -209,6 +217,7 @@ int BTree::countLeaves(int recAddr)
 	return isLeaf ? 1 : sum;
 }
 
+//method to adjust the root when we have a split that messes up the root
 void BTree::adjRoot (keyType rootElem, int oneAddr, int twoAddr)
 {
 
@@ -223,7 +232,7 @@ void BTree::splitNode (keyType& key,int recAddr,int& oneAddr,int& twoAddr)
 	BTNode n = getNode(recAddr);
 
 	//add all values in ValArray to a set
-	set<keyType> s (n.contents, n.contents+currSize);
+	set<keyType> s (n.contents, n.contents+n.currSize);
 
 	//add new key to the set
 	s.insert(key);
@@ -242,7 +251,7 @@ void BTree::splitNode (keyType& key,int recAddr,int& oneAddr,int& twoAddr)
 	keyType parent = *it;
 	
 	//increment iterator one more time to get the elements that will be in right child
-	it+=1;
+	advance(it,1);
 	keyType right_child = *it;
 
 	//how to get parent node? - use the pAddr method...but how to write this??
