@@ -64,6 +64,7 @@ void BTree::close ()
 void BTree::printTree()
 {
 	cout << "-------- B-tree of height " << height << " --------" << endl;
+	cout << "rootAddr: " << rootAddr << endl;
 	printTree(rootAddr);
 }
 
@@ -116,12 +117,12 @@ int BTree::countLeaves()
 //PRIVATE METHODS
 
 //print a preorder traversal of the tree
-void BTree::printTree (int rootAddr)
+void BTree::printTree (int rAddr)
 {
-	if (rootAddr != -1)
+	if (rAddr != -1)
         {
-                BTNode dummy = getNode(rootAddr);
-                printNode(rootAddr);
+                BTNode dummy = getNode(rAddr);
+                printNode(rAddr);
                 for (int i = 0;  i <= dummy.currSize;  i++)
                         printTree(dummy.child[i]);
         }
@@ -138,6 +139,8 @@ void BTree::reverse (int rootAddr)
 
 }
 //find address where the new key should be added to
+//precondition: pass in the key we are looking for, the root, and the address of the root
+//postcondition: return the address of the node that we should put the key into
 int BTree::findAddr (keyType key, BTNode t, int tAddr)
 {	
 	int nodeAddr;
@@ -265,18 +268,9 @@ void BTree::insert (keyType key, int recAddr, int oneAddr, int twoAddr)
 		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
 		treeFile.write((char*) &n, sizeof(BTNode));
 		
-		/*if (n.currSize == (ORDER-1))
-		{
-			treeFile.seekg(0);
-			BTNode file_node;
-			cout << "\nPRINTING TREE IN INSERT METHOD" << endl;
-			while(treeFile.read((char *) &file_node, sizeof(BTNode)))
-			{
-				cout << "Size:" << file_node.currSize << endl;
-				for(int i = 0; i < ORDER-1; i++)
-					cout << file_node.contents[i] << endl;
-			}
-		}*/
+		//printNode(recAddr);
+
+		
 		//print location of the file pointer
 		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
 		cout << endl;
@@ -309,7 +303,7 @@ BTNode BTree::getNode (int recAddr)
 //postcondition: nothing is returned, but the contents of the node are printed
 void BTree::printNode(int recAddr)
 {
-	BTNode n;
+	BTNode n = getNode(recAddr);
 	cout << "\t***node of size " << n.currSize << "***" << endl;
 	for (int i = 0; i < n.currSize; i++)
 	{
