@@ -91,9 +91,7 @@ int BTree::getHeight()
 
 bool BTree::search (keyType key)
 {
-	search (key, root, rootAddr);
-	
-	return false;
+	return search (key, root, rootAddr);
 }
 
 keyType BTree::retrieve (string key)
@@ -149,123 +147,36 @@ int BTree::findAddr (keyType key, BTNode t, int tAddr)
 	int nodeAddr;
 	cout << "IN FIND ADDR" << endl;
 	cout << "key we are finding a slot for: " << key << endl;
-//	if (tAddr != -1)
+		
+	//search through contents to see if content == key; if same, return true.
+	//if key < content, go to the child. 	
+	if (tAddr != -1)
         {
-		//look through the contents of the node to see where our key should go
-		for (int i = 0;  i <= t.currSize;  i++)
-                {	
-			cout << "IN FOR LOOP" << endl;
-			cout << "t.currSize: " << t.currSize << endl;
-			cout << "tAddr: " << tAddr << endl;
-			//If we are inserting a key less than the key or a duplicate and 
-			//the currentSize is less than ORDER-1, then insert the duplicate 
-			//to the tree. We ONLY insert a value if we have a leaf.
-	
-	/*		if ((key < t.contents[i] || key == t.contents[i])&& t.currSize < (ORDER-1) && isLeaf(t))
-			{				
-				cout << "key is less than, equal to, or greater than contents[i],";
-				cout << "key: " << key << endl;
-				cout << "t.contents[i]: " << t.contents[i] << endl;
-				nodeAddr = tAddr;			
-				break;
-			}
-			
-			//WE NEED TO SPLIT AND RETURN THE ADDRESS OF THE NODE WE NEED
-			//TO ENTER IT INTO.
-			else if (key == t.contents[i] && t.currSize == (ORDER-1) && isLeaf(t))
+		//look through the contents of the node to see if the key can be found
+		for (int i = 0;  i < t.currSize;  i++)
+                {
+			if (key < t.contents[i] && !isLeaf(t))
 			{
-				cout << "key is equal to contents[i]" << endl;
-				cout << "key: " << key << endl;
-				cout << "t.contents[i]: " << t.contents[i] << endl;
-				//We will need to determine where this key falls in the 
-				//contents array.
-				
-				//add all values in ValArray to a set
-				set<keyType> s (t.contents, t.contents+t.currSize);
-	
-				//add new key to the set
-				s.insert(key);
-				
-				//iterate through the set to find the middle element (the element that
-				//will ultimately be promoted)
-				int middle_index = (ORDER-1)/2;
-				set<keyType>::iterator it = s.begin();
-				int key_index;
-				for(int i = 0; i < (ORDER-1); i++)	
-				{
-					if(!(key == (*it)))
-						it++;
-					else
-					{
-						key_index = i;
-						break;
-					}
-				}	
-				
-				//get the key in middle_index 
-				it = s.begin();	
-				advance(it, middle_index-1);
-				keyType promotedVal = *it;
-
-				int oneAddr = -1;
-				int twoAddr = -1;
-
-				//CALL SPLITNODE
-				splitNode(key, tAddr, oneAddr, twoAddr);
-				//Split the node; have oneAddr be left node and twoAddr be the right 
-				//node. When we split the node, we compare the key to the element in 
-				//middle_index. 
-				if (key < promotedVal)
-					nodeAddr = oneAddr;
-				else if (promotedVal < key)
-					nodeAddr = twoAddr;
-				else
-					nodeAddr = tAddr;
-				break;
-			}
-					
-			else if (key < t.contents[i] && !isLeaf(t))
-			{
-				cout << "key is less than contents[i]] and is not a leaf" << endl;
-				cout << "key: " << key << endl;
-				cout << "t.contents[i]: " << t.contents[i] << endl;
+				cout << "key < t.contents[i] && !isLeaf" << endl;
 				//get the node of the child we are going to explore 
                 		BTNode dummy = getNode(t.child[i]);
 
 				//make a recursive call to search the child node
-				findAddr(key, dummy, t.child[i]);
+				return findAddr(key, dummy, t.child[i]);
 			}
-			else if (t.contents[i] < key && !isLeaf (t))
-			{
-				BTNode dummy;
-				//get the node of the child we are going to explore 
-                		if(t.currSize < ORDER-1)
-					dummy = getNode(t.child[i+1]);
-				else
-					dummy = getNode(t.child[i]);
-
-				//make a recursive call to search the child node
-				findAddr(key, dummy, t.child[i]);
-			}
-			else if (t.contents[i] < key && (i+1) == t.currSize && !isLeaf(t))
-			{
-				cout << "key is less than contents[i]] and i+1 == currSize and is not a leaf" << endl;
-				cout << "key: " << key << endl;
-				cout << "t.contents[i]: " << t.contents[i] << endl;
-				//get the last child that the current node points to
-				//so that we can search it to find our key.
-				BTNode dummy = getNode(t.child[i+1]);
-						
-				//make a recursive call to search the child node
-				findAddr(key, dummy, t.child[i+1]);
-			}
-
-			*/
+		}
+		//this means the key is greater than all values in the contents array. If it's
+		//not a leaf, explore it's children. Else, it does not exist in the BTree.
+		if (!isLeaf(t))
+		{
+			BTNode dummy = getNode(t.child[t.currSize]);
+			return findAddr(key,dummy,t.child[t.currSize]);
 		}
         }
-	cout << "nodeAddr being returned: " << nodeAddr << endl;
-	cout << "\nExiting FindAddr\n\n" << endl;
-	return nodeAddr;
+	else
+		return -1;
+	//if leaf and haven't found a slot, return tAddr
+	return tAddr;
 }
 //find the address of the parent of the given B-tree node
 int BTree::findpAddr(keyType key, BTNode t, int tAddr)
@@ -284,12 +195,14 @@ void BTree::insert (keyType key, int recAddr, int oneAddr, int twoAddr)
 	{
 		cout << "NOT LEAF" << endl;	
 		recAddr = findAddr(key, root, rootAddr);	
+		n = getNode(recAddr);
 	}
 	if (n.currSize < (ORDER-1))	
 	{
 		cout << "recAddr: " << recAddr << endl;
 		//add value to contents array, increment currSize, 
 		//and then sort contents
+		cout << "Size before inserting " << n.currSize << endl;
 		n.contents[n.currSize] = key;
 		cout << "n.contents[n.currSize]: " << n.contents[n.currSize] << endl;
 		n.currSize+=1;
@@ -524,37 +437,39 @@ void BTree::splitNode (keyType& key,int recAddr,int& oneAddr,int& twoAddr)
 bool BTree::search (keyType key, BTNode t, int tAddr)
 {
 	cout << "Searching for " << key << endl;
+	cout << "Searching in " << tAddr << endl;
 	bool found = false;
 	//search through contents to see if content == key; if same, return true.
 	//if key < content, go to the child. 	
 	if (tAddr != -1)
         {
+		cout << "Size = " << t.currSize << endl;
 		//look through the contents of the node to see if the key can be found
-		for (int i = 0;  i <= t.currSize;  i++)
+		for (int i = 0;  i < t.currSize;  i++)
                 {
+			cout << "Checking " << t.contents[i].getUPC() << endl;
 			if (key == t.contents[i])
 			{
-				found = true;
-				break;
+				cout << "TRUE!!!!!!!!!!!!!!!!" << endl;
+				return true;
 			}
-			else if (key < t.contents[i] && isLeaf(t))
+			else if (key < t.contents[i] && !isLeaf(t))
 			{
-				cout << "key < t.contents[i] && isLeaf" << endl;
+				cout << "key < t.contents[i] && !isLeaf" << endl;
 				//get the node of the child we are going to explore 
                 		BTNode dummy = getNode(t.child[i]);
 
 				//make a recursive call to search the child node
-				search(key, dummy, t.child[i]);
+				return search(key, dummy, t.child[i]);
 			}
-			else if (t.contents[i] < key && (i+1) == t.currSize)
-			{
-				//get the last child that the current node points to
-				//so that we can search it to find our key.
-				BTNode dummy = getNode(t.child[i+1]);
-						
-				//make a recursive call to search the child node
-				search(key, dummy, t.child[i+1]);
-			}
+		}
+		//this means the key is greater than all values in the contents array. If it's
+		//not a leaf, explore it's children. Else, it does not exist in the BTree.
+		if (!isLeaf(t))
+		{
+			cout << "Checking last child" << endl;
+			BTNode dummy = getNode(t.child[t.currSize]);
+			return search(key,dummy,t.child[t.currSize]);
 		}
         }
 	//if leaf and can't find it, return false 
