@@ -14,7 +14,7 @@ BTree::BTree()
 void BTree::writeHeader (char * fileName)
 {
 	//set the treeFile object where our BTree is stored
-	treeFile.open(fileName, ios::in|ios::out|ios::binary);
+	treeFile.open(fileName, ios::trunc | ios::in|ios::out|ios::binary);
 
 	//set file pointer to beginning of the file
 	treeFile.seekp(0);
@@ -50,9 +50,12 @@ void BTree::insert (keyType key)
 	insert(key,rootAddr, -1, -1);
 }
 
+
+
+//use when updating BT
 void BTree::reset (char * filename)
 {
-
+	
 }
 
 void BTree::close ()
@@ -144,16 +147,25 @@ void BTree::reverse (int rootAddr)
 int BTree::findAddr (keyType key, BTNode t, int tAddr)
 {	
 	int nodeAddr;
-	if (tAddr != -1)
+	cout << "IN FIND ADDR" << endl;
+	cout << "key we are finding a slot for: " << key << endl;
+//	if (tAddr != -1)
         {
 		//look through the contents of the node to see where our key should go
 		for (int i = 0;  i <= t.currSize;  i++)
-                {
+                {	
+			cout << "IN FOR LOOP" << endl;
+			cout << "t.currSize: " << t.currSize << endl;
+			cout << "tAddr: " << tAddr << endl;
 			//If we are inserting a key less than the key or a duplicate and 
 			//the currentSize is less than ORDER-1, then insert the duplicate 
 			//to the tree. We ONLY insert a value if we have a leaf.
-			if ((key < t.contents[i] || key == t.contents[i])&& t.currSize < (ORDER-1) && isLeaf(t))
+	
+	/*		if ((key < t.contents[i] || key == t.contents[i])&& t.currSize < (ORDER-1) && isLeaf(t))
 			{				
+				cout << "key is less than, equal to, or greater than contents[i],";
+				cout << "key: " << key << endl;
+				cout << "t.contents[i]: " << t.contents[i] << endl;
 				nodeAddr = tAddr;			
 				break;
 			}
@@ -162,6 +174,9 @@ int BTree::findAddr (keyType key, BTNode t, int tAddr)
 			//TO ENTER IT INTO.
 			else if (key == t.contents[i] && t.currSize == (ORDER-1) && isLeaf(t))
 			{
+				cout << "key is equal to contents[i]" << endl;
+				cout << "key: " << key << endl;
+				cout << "t.contents[i]: " << t.contents[i] << endl;
 				//We will need to determine where this key falls in the 
 				//contents array.
 				
@@ -196,7 +211,7 @@ int BTree::findAddr (keyType key, BTNode t, int tAddr)
 				int twoAddr = -1;
 
 				//CALL SPLITNODE
-
+				splitNode(key, tAddr, oneAddr, twoAddr);
 				//Split the node; have oneAddr be left node and twoAddr be the right 
 				//node. When we split the node, we compare the key to the element in 
 				//middle_index. 
@@ -211,14 +226,32 @@ int BTree::findAddr (keyType key, BTNode t, int tAddr)
 					
 			else if (key < t.contents[i] && !isLeaf(t))
 			{
+				cout << "key is less than contents[i]] and is not a leaf" << endl;
+				cout << "key: " << key << endl;
+				cout << "t.contents[i]: " << t.contents[i] << endl;
 				//get the node of the child we are going to explore 
                 		BTNode dummy = getNode(t.child[i]);
 
 				//make a recursive call to search the child node
 				findAddr(key, dummy, t.child[i]);
 			}
+			else if (t.contents[i] < key && !isLeaf (t))
+			{
+				BTNode dummy;
+				//get the node of the child we are going to explore 
+                		if(t.currSize < ORDER-1)
+					dummy = getNode(t.child[i+1]);
+				else
+					dummy = getNode(t.child[i]);
+
+				//make a recursive call to search the child node
+				findAddr(key, dummy, t.child[i]);
+			}
 			else if (t.contents[i] < key && (i+1) == t.currSize && !isLeaf(t))
 			{
+				cout << "key is less than contents[i]] and i+1 == currSize and is not a leaf" << endl;
+				cout << "key: " << key << endl;
+				cout << "t.contents[i]: " << t.contents[i] << endl;
 				//get the last child that the current node points to
 				//so that we can search it to find our key.
 				BTNode dummy = getNode(t.child[i+1]);
@@ -226,9 +259,12 @@ int BTree::findAddr (keyType key, BTNode t, int tAddr)
 				//make a recursive call to search the child node
 				findAddr(key, dummy, t.child[i+1]);
 			}
+
+			*/
 		}
         }
-
+	cout << "nodeAddr being returned: " << nodeAddr << endl;
+	cout << "\nExiting FindAddr\n\n" << endl;
 	return nodeAddr;
 }
 //find the address of the parent of the given B-tree node
@@ -267,10 +303,11 @@ void BTree::insert (keyType key, int recAddr, int oneAddr, int twoAddr)
 		treeFile.seekg(recAddr);
 		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
 		treeFile.write((char*) &n, sizeof(BTNode));
-		
-		//printNode(recAddr);
 
-		
+		//update root address
+		if(recAddr == rootAddr)
+			root = n;
+			
 		//print location of the file pointer
 		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
 		cout << endl;
@@ -280,8 +317,10 @@ void BTree::insert (keyType key, int recAddr, int oneAddr, int twoAddr)
 	else
 	{
 		cout << "SPLITTING" << endl;
-		//splitNode (key,recAddr,oneAddr,twoAddr);
-		//placeNode (key,recAddr,oneAddr,twoAddr);
+		int oneAddr = -1;
+		int twoAddr = -1;
+		splitNode (key,recAddr,oneAddr,twoAddr);
+		placeNode (key,recAddr,oneAddr,twoAddr);
 	}
 }
 
@@ -314,7 +353,92 @@ void BTree::printNode(int recAddr)
 //resets the tree/promotes the root after splitting a node
 void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 {
+	//create node for recAddr
+	BTNode n = getNode(recAddr);
 
+	//add all values in ValArray to a set
+	set<keyType> s (n.contents, n.contents+n.currSize);
+	s.insert(k);
+	set<keyType>::iterator it = s.begin();
+
+
+	//CREATE 3 NEW NODES FOR THE SPLIT
+	BTNode parent; //recAddr
+	int p_counter = 0;
+
+	BTNode left_child; //oneAddr 
+	int lc_counter = 0;
+
+	BTNode right_child; //twoAddr
+	int rc_counter = 0;
+
+
+	//find the middle index, or the value that is being promoted.
+	it = s.begin();
+	int middle_index = (ORDER-1)/2;
+	advance(it, middle_index);
+	Album p_album = *it;
+	it = s.begin();
+	
+	cout << "\n\n in PlaceNode: " << endl;
+	cout << "s.size(): " << s.size() << endl;
+	
+	for (int i = 0; i < s.size(); i++)
+	{
+		Album album = *it;
+		if(*it < p_album)
+		{
+			cout << "Adding " << album << " to left child." << endl;
+			left_child.contents[lc_counter] = album;
+			lc_counter+=1; 
+		}
+		else if(*it == p_album)
+		{
+			cout << "Adding " << album << " to parent." << endl;
+			parent.contents[p_counter] = album;
+			p_counter+=1;
+		}		
+		else
+		{
+			cout << "Adding " << album << " to right child." << endl;
+			right_child.contents[rc_counter] = album;
+			rc_counter+=1;
+		}
+		it++;
+	}
+	parent.currSize = p_counter;
+	left_child.currSize = lc_counter;
+	right_child.currSize = rc_counter;
+
+	//set the children of parent node
+	parent.child[0] = oneAddr;
+	parent.child[1] = twoAddr;
+
+	//fill leaves for new children
+	for(int i = 0; i < ORDER; i++)
+	{
+		left_child.child[i] = -1;
+		right_child.child[i] = -1;
+	}
+	root = parent;
+	rootAddr = recAddr;
+	cout << "writing new nodes in split node" << endl;
+	cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
+	treeFile.seekg(recAddr);
+	cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
+	treeFile.write((char*) &parent, sizeof(BTNode));
+	cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
+	treeFile.write((char*) &left_child, sizeof(BTNode));
+	treeFile.write((char*) &right_child, sizeof(BTNode));
+
+
+	//FIX THE HEADER NODE ROOT ADDRESS
+	treeFile.seekg(0, ios::beg);
+	BTNode header;
+	header.child[0] = rootAddr;
+	treeFile.write((char*)&header, sizeof(BTNode));
+
+	cout << "\n\n" << endl;
 }
 //method to determine if the current node is a leaf or not
 //precondition: pass in the address of the record
@@ -371,26 +495,25 @@ void BTree::splitNode (keyType& key,int recAddr,int& oneAddr,int& twoAddr)
 	s.insert(key);
 
 	//iterate through the set to find the middle element (the element that
-	//will ultimately be promoted)
+	//will ultimately be promoted). This gets the index that the middle element
+	//is stored in.
 	int middle_index = (ORDER-1)/2;
 	set<keyType>::iterator it = s.begin();
 
 	//Use the advance method to move the iterator where we need it
 	//The advance moves the iterator to the position of the middle_index value,
 	//so if we start at index = 0, we want it to move middle_index-1 slots forward.
-	advance(it, middle_index-1);
+	advance(it, middle_index);
 
 	//set the keyType parent equal to the element being promoted.
-	keyType parent = *it;
+	keyType parent_album = *it;
 	
-	//increment iterator one more time to get the elements that will be in right child
-	advance(it,1);
-	keyType right_child = *it;
+	//update oneAddr and twoAddr - which is the left and right child respectively	
+	oneAddr = recAddr+sizeof(BTNode);
+	twoAddr = oneAddr+sizeof(BTNode);
 
-	//how to get parent node? - use the pAddr method...but how to write this??
-
-
-	//NOW: Update oneAddr and twoAddr - which is the parent address and right child address respectively	
+	//update the key to be the parent_album so that we can use it in the placeNode method
+//	key = parent_album;
 }
 //method to search through the tree when given a transaction file 
 //initially -- pass in the string key (from the transaction file), root, and
@@ -398,7 +521,6 @@ void BTree::splitNode (keyType& key,int recAddr,int& oneAddr,int& twoAddr)
 //updated -- pass in the album object so that this isn't stuck to only processing
 //Album object
 //postcondition: return a boolean indicating if the value was found or not
-
 bool BTree::search (keyType key, BTNode t, int tAddr)
 {
 	cout << "Searching for " << key << endl;
@@ -415,8 +537,9 @@ bool BTree::search (keyType key, BTNode t, int tAddr)
 				found = true;
 				break;
 			}
-			else if (key < t.contents[i])
+			else if (key < t.contents[i] && isLeaf(t))
 			{
+				cout << "key < t.contents[i] && isLeaf" << endl;
 				//get the node of the child we are going to explore 
                 		BTNode dummy = getNode(t.child[i]);
 
@@ -434,7 +557,6 @@ bool BTree::search (keyType key, BTNode t, int tAddr)
 			}
 		}
         }
-
 	//if leaf and can't find it, return false 
 	return found;
 }
