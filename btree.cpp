@@ -179,9 +179,60 @@ int BTree::findAddr (keyType key, BTNode t, int tAddr)
 	return tAddr;
 }
 //find the address of the parent of the given B-tree node
-int BTree::findpAddr(keyType key, BTNode t, int tAddr)
+//Used in place node, which is called when splitting the node.
+//precondition: pass in the keyType object, the root node, and the 
+//address of the child we're looking for
+//postcondition: return the parent of the childAddr we passed in.
+int BTree::findpAddr(keyType key, BTNode t, int tAddr, int childAddr)
 {
-	return 0;
+	//Iterate through the contents of the current contents array.
+	//We need to look at all the addresses stored in the child array of the 
+	//current element in the contents array.
+	
+
+	/*
+ 		1. Get the current album at contents[i]
+		2. Compare the key to our album at contents[i]
+			a. If key is less than contents[i], then see if the value
+			in child[i] is the same as childAddr. If it is, then return
+			tAddr. Else, keep looking.
+			b. if i == 
+  	*/
+
+	//CASE FOR IF CHILDADDR == ROOTADDR??
+
+	//if key < contents of value and child is not -1, then 
+
+
+	//KINDA LIKE PRINT TREE TRAVERSAL
+	//
+	//RECURSIVELY CALL METHOD UNTIL WE FIND IT.
+
+	//loop through child array for current node
+	for(int i = 0; i < t.currSize+1; i++)
+	{
+		if (t.child[i] == childAddr)
+			return tAddr;	
+	}
+	for (int i = 0; i < t.currSize; i++)
+	{
+		//if key is less than current contents, then go left.
+		if (key < t.contents[i] && !isLeaf(t))
+		{
+			BTNode newNode = getNode(t.child[i]);
+			return findpAddr(key, newNode, t.child[i], childAddr);
+		}
+	}
+	//by this point, we iterated through all the left children of contents[i]
+	//elements and need to look at the final child element in the child array.
+	if (!isLeaf(t))
+	{
+		BTNode newNode = getNode(t.child[t.currSize]);
+		return findpAddr(key,newNode,t.child[t.currSize], childAddr);
+	}
+
+	//return -1 to indicate that the parent address was never found 
+	return -1;
 }
 //
 void BTree::insert (keyType key, int recAddr, int oneAddr, int twoAddr)
@@ -269,7 +320,19 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 	//create node for recAddr
 	BTNode n = getNode(recAddr);
 
-	//add all values in ValArray to a set
+	//add all Pairs in ValArray to a set of Pairs
+/*	set<Pair>s;
+	set<Pair>::iterator it = s.begin(); //iterator for our set of Pairs
+	//create the Pairs
+	for (int i = 0; i < n.currSize; i++)
+	{
+		Pair p;
+		p.element = n.contents[i];
+		p.loffset = n.child[i];
+		p.roffset = n.child[i+1];
+		s.insert(p);
+	}*/
+
 	set<keyType> s (n.contents, n.contents+n.currSize);
 	s.insert(k);
 	set<keyType>::iterator it = s.begin();
@@ -277,14 +340,13 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 
 	//CREATE 3 NEW NODES FOR THE SPLIT
 	BTNode parent; //recAddr
-	int p_counter = 0;
+	parent.currSize = 0;
 
 	BTNode left_child; //oneAddr 
-	int lc_counter = 0;
+	left_child.currSize = 0;
 
 	BTNode right_child; //twoAddr
-	int rc_counter = 0;
-
+	right_child.currSize = 0;
 
 	//find the middle index, or the value that is being promoted.
 	it = s.begin();
@@ -296,33 +358,30 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 	cout << "\n\n in PlaceNode: " << endl;
 	cout << "s.size(): " << s.size() << endl;
 	
+	//fill in the contents arrays for the parent/left_child/right_child nodes
 	for (int i = 0; i < s.size(); i++)
 	{
 		Album album = *it;
-		if(*it < p_album)
+		if(album < p_album)
 		{
 			cout << "Adding " << album << " to left child." << endl;
-			left_child.contents[lc_counter] = album;
-			lc_counter+=1; 
+			left_child.contents[left_child.currSize] = album;
+			left_child.currSize+=1;
 		}
-		else if(*it == p_album)
+		else if(album == p_album)
 		{
 			cout << "Adding " << album << " to parent." << endl;
-			parent.contents[p_counter] = album;
-			p_counter+=1;
+			parent.contents[parent.currSize] = album;
+			parent.currSize+=1;
 		}		
 		else
 		{
 			cout << "Adding " << album << " to right child." << endl;
-			right_child.contents[rc_counter] = album;
-			rc_counter+=1;
+			right_child.contents[right_child.currSize] = album;
+			right_child.currSize+=1;
 		}
 		it++;
 	}
-	parent.currSize = p_counter;
-	left_child.currSize = lc_counter;
-	right_child.currSize = rc_counter;
-
 	//set the children of parent node
 	parent.child[0] = oneAddr;
 	parent.child[1] = twoAddr;
@@ -333,23 +392,62 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 		left_child.child[i] = -1;
 		right_child.child[i] = -1;
 	}
-	root = parent;
-	rootAddr = recAddr;
+
+	cout << "rootAddr: " << rootAddr << endl;
+	cout << "address of node being split: " << recAddr << endl;
+
+	//update the root with the new root, if our node is a root
+	if(rootAddr == recAddr)
+	{
+		cout << "rootAddr  == recAddr" << endl;
+		root = parent;
+		rootAddr = recAddr;
+		//FIX THE HEADER NODE ROOT ADDRESS
+		treeFile.seekg(0, ios::beg);
+		BTNode header;
+		header.child[0] = rootAddr;
+		treeFile.write((char*)&header, sizeof(BTNode));//else, this is 
+	}
+
+	//ALGORITHM FOR RAISING A NODE TO AN ALREADY OCCUPIED NODE? NOT NEW ROOT.
+	//1. Create a set of Pairs with our parent node and repective children.
+	
+	else
+	{
+		cout << "rootAddr != recAddr" << endl;
+		//Get the album in the far left slot of the node being split.
+		//aka, get the album in the first index of the contents array of the
+		//node being split.
+		keyType album = n.contents[0]; 
+		cout << "far left element in split node: " << album << endl;
+
+		//Make a call to pAddr to get the address of the parent node to the
+		//node we are splitting. 
+		int pAddr = findpAddr(album, root, rootAddr, recAddr);
+		cout << "address of node being split: " << recAddr << endl;
+		cout << "address of parent node for the node being split:" << pAddr << endl;
+		
+			
+	}
 	cout << "writing new nodes in split node" << endl;
-	cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
-	treeFile.seekg(recAddr);
-	cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
-	treeFile.write((char*) &parent, sizeof(BTNode));
+	//seek to the end of the file to write our new nodes there
+	treeFile.seekg(0, ios::end);	
+	oneAddr = treeFile.tellp();
+	cout << "writing left child" << endl;
 	cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
 	treeFile.write((char*) &left_child, sizeof(BTNode));
+
+	//write right_child immediately after the left_child	
+	twoAddr = treeFile.tellp();
+	cout << "writing right child" << endl;
+	cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
 	treeFile.write((char*) &right_child, sizeof(BTNode));
 
-
-	//FIX THE HEADER NODE ROOT ADDRESS
-	treeFile.seekg(0, ios::beg);
-	BTNode header;
-	header.child[0] = rootAddr;
-	treeFile.write((char*)&header, sizeof(BTNode));
+	//move the file pointer to the parent node position
+	treeFile.seekg(recAddr);
+	cout << "writing new parent" << endl;	
+	cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
+	treeFile.write((char*) &parent, sizeof(BTNode));
 
 	cout << "\n\n" << endl;
 }
@@ -420,9 +518,11 @@ void BTree::splitNode (keyType& key,int recAddr,int& oneAddr,int& twoAddr)
 
 	//set the keyType parent equal to the element being promoted.
 	keyType parent_album = *it;
+
+	treeFile.seekg(0, ios::end);
 	
 	//update oneAddr and twoAddr - which is the left and right child respectively	
-	oneAddr = recAddr+sizeof(BTNode);
+	oneAddr = treeFile.tellg();
 	twoAddr = oneAddr+sizeof(BTNode);
 
 	//update the key to be the parent_album so that we can use it in the placeNode method
