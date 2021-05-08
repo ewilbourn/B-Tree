@@ -45,7 +45,7 @@ class BTree
 	void inorder();
 	void reverse();
 	int getHeight();
-	bool search (string key);
+	bool search (keyType key);
 	keyType retrieve (string key);
 	void totalio() const;
 	int countLeaves();
@@ -63,7 +63,7 @@ class BTree
 	int write;
 
 	int findAddr (keyType key, BTNode t, int tAddr);
-	int findpAddr(keyType key, BTNode t, int tAddr);
+	int findpAddr(keyType key, BTNode t, int tAddr, int childAddr);
 	void insert (keyType key, int recAddr, int oneAddr, int twoAddr);
         BTNode getNode (int recAddr);
 	void printNode(int recAddr);
@@ -73,7 +73,7 @@ class BTree
 	int countLeaves(int recAddr);
         void adjRoot (keyType rootElem, int oneAddr, int twoAddr);
         void splitNode (keyType& key,int recAddr,int& oneAddr,int& twoAddr);
-	bool search (string key, BTNode t, int tAddr);
+	bool search (keyType key, BTNode t, int tAddr);
 	
 };
 
