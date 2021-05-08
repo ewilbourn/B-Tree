@@ -231,6 +231,7 @@ int BTree::findpAddr(keyType key, BTNode t, int tAddr, int childAddr)
 void BTree::insert (keyType key, int recAddr, int oneAddr, int twoAddr)
 {
 	BTNode n = getNode(recAddr);
+	
 	//need this to be less than order-1 because initially currSize will be 0,
 	//and after adding a new node, this will be full (at size ORDER-1)
 	cout << "INSERTING VALUE" << endl;
@@ -276,8 +277,11 @@ void BTree::insert (keyType key, int recAddr, int oneAddr, int twoAddr)
 		cout << "SPLITTING" << endl;
 		int oneAddr = -1;
 		int twoAddr = -1;
+
+		cout << "root elements BEFORE the split: " << endl;
+		printNode(rootAddr);
+//		placeNode (key,recAddr,oneAddr,twoAddr);
 		splitNode (key,recAddr,oneAddr,twoAddr);
-		placeNode (key,recAddr,oneAddr,twoAddr);
 	}
 }
 
@@ -308,11 +312,21 @@ void BTree::printNode(int recAddr)
 		cout << "\tcontents["  << i << "]" << endl;
 		cout << "\t" << n.contents[i] << endl;	
 	}
+	for (int i = 0; i < ORDER; i++)
+	{
+		cout << "n.child[" << i << "]: " << n.child[i] << endl;
+	}
 }
 
-//resets the tree/promotes the root after splitting a node
+//after retrieving the addresses for the left and right children (oneAddr/twoAddr)
 void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 {
+	
+	cout << "ONEADDR BEING PASSED INTO PLACENODE: " << oneAddr << endl;
+	cout << "TWOADDR BEING PASSED INTO PLACENODE: " << twoAddr << endl;
+
+	cout << "root contents when first entering placeNode: " << endl;
+	printNode(rootAddr);	
 	//create node for recAddr
 	BTNode n = getNode(recAddr);
 
@@ -341,9 +355,6 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 	advance(it, middle_index);
 	keyType p_album = *it;
 	it = s.begin();
-	
-	cout << "\n\n in PlaceNode: " << endl;
-	cout << "s.size(): " << s.size() << endl;
 	
 	cout << "root contents: " << endl;
 	printNode(rootAddr);	
@@ -417,6 +428,9 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 		split_node_parent = getNode(pAddr);
 	}
 	
+	//update the root with the new root, if our node being split is a root
+	if (rootAddr == recAddr)	
+		adjRoot (parent.contents[0], oneAddr, twoAddr);
 	cout << "root contents: " << endl;
 	printNode(rootAddr);	
 
@@ -573,16 +587,46 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 		//BTNode new_parent;	
 		new_parent.currSize = 0;
 		cout << "\n\nprinting final contents of parent node: " << endl;
+		//put the contents of our Pairs into a new Node that will be entered into the tree
 		for (int i = 0; i < s_pairs.size(); i++)
-		{
+		{	
+			if (parent.currSize == ORDER-1)
+			{
+				treeFile.seekg(0, ios::end);
+		
+				//update oneAddr and twoAddr - which is the left and right child respectively	
+				oneAddr = treeFile.tellg();
+				twoAddr = oneAddr+sizeof(BTNode);
+	
+				//call splitNode recursively to split the new full parents	
+				splitNode(k, pAddr, oneAddr, twoAddr);
+			}
+			
 			Pair curr_pair = *p_it;
 			new_parent.contents[i] = curr_pair.element;
+			cout << "new_parent.contents[" << i << "]: " << new_parent.contents[i] << endl;
 			new_parent.child[i] = curr_pair.loffset;
+			cout << "new_parent.child[" << i << "]: " << new_parent.child[i] << endl;
 			new_parent.child[i+1] = curr_pair.roffset;
+			cout << "new_parent.child[" << i+1 << "]: " << new_parent.child[i+1] << endl;
 			new_parent.currSize+=1;
-			cout << new_parent.contents[i] << endl;
+			cout << "new_parent.currSize: " << new_parent.currSize << endl;
+			cout << endl;	
 			p_it++;
-		}	
+		}
+		//fill up rest of children nodes for new_parent with -1's
+		if (new_parent.currSize < ORDER-1)
+		{
+			for (int i = new_parent.currSize+1; i < ORDER; i++)
+			{
+				new_parent.child[i] = -1;
+			}
+		}
+		cout << "ALL CHILDREN OF THE NEW_PARENT: " << endl;
+		for (int i = 0; i < ORDER; i++)
+		{
+			cout << new_parent.child[i] << endl;
+		}			
 		cout << endl;
 		//update the root with the new root, if our node is a root
 		if(rootAddr == pAddr)
@@ -594,7 +638,7 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 			for (int i = 0; i < new_parent.currSize; i++)
 			{
 				cout << "contents[" << i << "]: " << new_parent.contents[i] << endl;
-				cout << "child[" << i << "]: " << new_parent.child[i] << endl;
+			//	cout << "child[" << i << "]: " << new_parent.child[i] << endl;
 			}
 	
 			cout << endl;
@@ -605,7 +649,7 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 			treeFile.write((char*)&header1, sizeof(BTNode));//else, this is 
 		}
 	}
-	cout << "writing new nodes in split node" << endl;
+		cout << "writing new nodes in split node" << endl;
 		//seek to the end of the file to write our new nodes there
 		treeFile.seekg(0, ios::end);	
 		oneAddr = treeFile.tellp();
@@ -619,10 +663,7 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
 		treeFile.write((char*) &right_child, sizeof(BTNode));
 	
-		//update the root with the new root, if our node being split is a root
-		if (rootAddr == recAddr)	
-			adjRoot (parent.contents[0], oneAddr, twoAddr);
-		else
+		if (rootAddr != recAddr)
 		{
 			cout << "PRINTING WHEN PUSHING NODE TO ALREADY OCCUPIED ROOT" << endl;
 			//move the file pointer to the parent node position
@@ -680,6 +721,10 @@ int BTree::countLeaves(int recAddr)
 void BTree::adjRoot (keyType rootElem, int oneAddr, int twoAddr)
 {
 	cout << "ADJUSTING ROOT" << endl;
+	cout << "print root before updating it: " << endl;
+	printNode(rootAddr);
+	cout << "oneAddr: " << oneAddr << endl;
+	cout << "twoAddr: " << twoAddr << endl;
 
 	//increment the height by 1.
 	height += 1;
@@ -690,7 +735,16 @@ void BTree::adjRoot (keyType rootElem, int oneAddr, int twoAddr)
 	new_root.child[0] = oneAddr; //left child address
 	new_root.child[1] = twoAddr; //right child address
 
+	//fill in the rest of the children addresses
+	for (int i = 2; i < ORDER; i++)
+	{
+		new_root.child[i] = -1;
+	}
+	
 	root = new_root;	
+
+	cout << "print root after updating it: " << endl;
+	printNode(rootAddr);
 
 	//fix the header node to reflect this update
 	treeFile.seekg(0, ios::beg);
@@ -720,29 +774,8 @@ void BTree::adjRoot (keyType rootElem, int oneAddr, int twoAddr)
 void BTree::splitNode (keyType& key,int recAddr,int& oneAddr,int& twoAddr)
 {
 	cout << "SPLITTING NODE" << endl;
-
-	//create node for recAddr
-	BTNode n = getNode(recAddr);
-
-	//add all values in ValArray to a set
-	set<keyType> s (n.contents, n.contents+n.currSize);
-
-	//add new key to the set
-	s.insert(key);
-
-	//iterate through the set to find the middle element (the element that
-	//will ultimately be promoted). This gets the index that the middle element
-	//is stored in.
-	int middle_index = (ORDER-1)/2;
-	set<keyType>::iterator it = s.begin();
-
-	//Use the advance method to move the iterator where we need it
-	//The advance moves the iterator to the position of the middle_index value,
-	//so if we start at index = 0, we want it to move middle_index-1 slots forward.
-	advance(it, middle_index);
-
-	//set the keyType parent equal to the element being promoted.
-	keyType parent_album = *it;
+	cout << "root contents immediately after entering splitNode: " << endl;
+	printNode(rootAddr);	
 
 	treeFile.seekg(0, ios::end);
 	
@@ -750,8 +783,24 @@ void BTree::splitNode (keyType& key,int recAddr,int& oneAddr,int& twoAddr)
 	oneAddr = treeFile.tellg();
 	twoAddr = oneAddr+sizeof(BTNode);
 
-	//update the key to be the parent_album so that we can use it in the placeNode method
-//	key = parent_album;
+	cout << "root contents after defining oneAddr and twoAddr: " << endl;
+	printNode(rootAddr);	
+	cout << "SPLITTING NODE - ONEADDR: " << oneAddr << endl;
+	cout << "SPLITTING NODE - TWOADDR: " << twoAddr << endl;
+
+	BTNode n = getNode(recAddr);
+	cout << "root contents after calling getNode(recAddr): " << endl;
+	printNode(rootAddr);	
+
+	keyType album = n.contents[0]; 
+	cout << "far left element in split node: " << album << endl;
+
+	cout << "root contents right before entering placeNode: " << endl;
+	printNode(rootAddr);	
+	
+	//call placeNode to perform the actual split/placing of node
+	placeNode (key, recAddr, oneAddr, twoAddr);
+	
 }
 //method to search through the tree when given a transaction file 
 //initially -- pass in the string key (from the transaction file), root, and
