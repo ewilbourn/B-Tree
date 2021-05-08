@@ -420,23 +420,10 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 	cout << "root contents: " << endl;
 	printNode(rootAddr);	
 
-	//update the root with the new root, if our node is a root
-	if(rootAddr == recAddr)
-	{
-		cout << "rootAddr  == recAddr" << endl;
-		root = parent;
-		rootAddr = recAddr;
-		//FIX THE HEADER NODE ROOT ADDRESS
-		treeFile.seekg(0, ios::beg);
-		BTNode header;
-		header.child[0] = rootAddr;
-		treeFile.write((char*)&header, sizeof(BTNode));//else, this is 
-	}
-
 	//ALGORITHM FOR RAISING A NODE TO AN ALREADY OCCUPIED NODE? NOT NEW ROOT.
 	//1. Create a set of Pairs with our parent node and repective children.
 	
-	else
+	if (rootAddr != recAddr)
 	{
 		cout << "rootAddr != recAddr" << endl;
 		
@@ -601,31 +588,7 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 		if(rootAddr == pAddr)
 		{
 			cout << "rootAddr  == pAddr" << endl;
-			cout << "rootAddr before updating: " << rootAddr << endl;
-			printNode(rootAddr);
-			//root.currSize = 0;
-			cout << "new_parent.currSize: " << new_parent.currSize << endl; 	
-			/*for (int i = 0; i < new_parent.currSize; i++)
-			{
-				root.contents[i] = new_parent.contents[i];
-				root.child[i] = new_parent.child[i];
-				root.currSize += 1;
-			}
-			//fill in -1's for rest of empty children
-			if (root.currSize < ORDER-1)
-			{
-				for (int j = root.currSize; j < ORDER; j++)
-				{
-					root.child[j] = -1;	
-				}
-			}*/
-			//cout << "rootAddr after updating contents and child arrays: " << rootAddr << endl;
-			//printNode(rootAddr);
 			root = new_parent;
-			rootAddr = pAddr;
-			cout << "\nprint rootAddr: " << endl;
-			cout << "rootAddr: " << rootAddr << endl;
-			printNode(rootAddr);
 			
 			cout << "PRINT NEW_PARENT NODE" << endl;	
 			for (int i = 0; i < new_parent.currSize; i++)
@@ -643,55 +606,36 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 		}
 	}
 	cout << "writing new nodes in split node" << endl;
-	if(rootAddr == recAddr)
-	{
 		//seek to the end of the file to write our new nodes there
 		treeFile.seekg(0, ios::end);	
-		//oneAddr = treeFile.tellp();
+		oneAddr = treeFile.tellp();
 		cout << "writing left child" << endl;
 		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
 		treeFile.write((char*) &left_child, sizeof(BTNode));
-		oneAddr = treeFile.tellp();
 	
 		//write right_child immediately after the left_child	
-		//twoAddr = treeFile.tellp();
-		cout << "writing right child" << endl;
-		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
-		treeFile.write((char*) &right_child, sizeof(BTNode));
 		twoAddr = treeFile.tellp();
-	
-		//move the file pointer to the parent node position
-		treeFile.seekg(recAddr);
-		cout << "writing new parent" << endl;	
-		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
-		treeFile.write((char*) &parent, sizeof(BTNode));
-	}
-	else
-	{
-		cout << "PRINTING WHEN PUSHING NODE TO ALREADY OCCUPIED ROOT" << endl;
-		//seek to the end of the file to write our new nodes there
-		treeFile.seekg(0, ios::end);	
-		//oneAddr = treeFile.tellp();
-		cout << "writing left child" << endl;
-		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
-		treeFile.write((char*) &left_child, sizeof(BTNode));
-		oneAddr = treeFile.tellp();
-	
-		//write right_child immediately after the left_child	
-		//twoAddr = treeFile.tellp();
 		cout << "writing right child" << endl;
 		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
 		treeFile.write((char*) &right_child, sizeof(BTNode));
-		//move the file pointer to the parent node position
-		treeFile.seekg(pAddr);
-		cout << "writing new parent" << endl;	
-		cout << "new_parent.currSize: " << new_parent.currSize << endl;
-		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
-		treeFile.write((char*) &new_parent, sizeof(BTNode));
+	
+		//update the root with the new root, if our node being split is a root
+		if (rootAddr == recAddr)	
+			adjRoot (parent.contents[0], oneAddr, twoAddr);
+		else
+		{
+			cout << "PRINTING WHEN PUSHING NODE TO ALREADY OCCUPIED ROOT" << endl;
+			//move the file pointer to the parent node position
+			treeFile.seekg(pAddr);
+			cout << "writing new parent" << endl;	
+			cout << "new_parent.currSize: " << new_parent.currSize << endl;
+			cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
+			treeFile.write((char*) &new_parent, sizeof(BTNode));
 		
-		cout << "rootAddr: " << rootAddr << endl;
-		printNode(rootAddr);
-	}
+			cout << "rootAddr: " << rootAddr << endl;
+			printNode(rootAddr);
+		}
+	
 	cout << "\n\n" << endl;
 }
 //method to determine if the current node is a leaf or not
@@ -728,10 +672,48 @@ int BTree::countLeaves(int recAddr)
 	return isLeaf ? 1 : sum;
 }
 
-//method to adjust the root when we have a split that messes up the root
+//method to update the root when we split the root
+//precondition: pass in the element that will next be stored in the root,
+//the left child address (oneAddr), and the right child address (twoAddr)
+//postcondition: return nothing, but the root is rewritten to our treefile
+//and our header file is updated
 void BTree::adjRoot (keyType rootElem, int oneAddr, int twoAddr)
 {
+	cout << "ADJUSTING ROOT" << endl;
 
+	//increment the height by 1.
+	height += 1;
+
+	BTNode new_root;
+	new_root.currSize = 1;
+	new_root.contents[0] = rootElem;
+	new_root.child[0] = oneAddr; //left child address
+	new_root.child[1] = twoAddr; //right child address
+
+	root = new_root;	
+
+	//fix the header node to reflect this update
+	treeFile.seekg(0, ios::beg);
+	BTNode header;
+	header.child[0] = rootAddr;
+	treeFile.write((char*)&header, sizeof(BTNode));//else, this is 
+
+	//increment writes to the file
+	write += 1;
+
+	//move the file pointer to the root node position and overwrite the root
+	treeFile.seekg(rootAddr);
+	cout << "writing new parent" << endl;	
+	cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
+	treeFile.write((char*) &new_root, sizeof(BTNode));
+	
+	//increment writes to the file
+	write += 1;
+
+	cout << "print root after updating it: " << endl;
+	printNode(rootAddr);
+
+	cout << "LEAVE ADJUSTING ROOT" << endl;
 }
 
 //method to split a node when we try to add a record to a full node
