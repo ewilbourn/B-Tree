@@ -308,6 +308,8 @@ void BTree::printNode(int recAddr)
 {
 	BTNode n = getNode(recAddr);
 	cout << "\t***node of size " << n.currSize << "***" << endl;
+	cout << "\tis our node a leaf?" << std::boolalpha << isLeaf(n) << endl;
+	cout << "\trecAddr: " << recAddr << endl;
 	for (int i = 0; i < n.currSize; i++)
 	{
 		cout << n.contents[i] << endl;	
@@ -320,39 +322,30 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 	//create node for recAddr
 	BTNode n = getNode(recAddr);
 
-	//add all Pairs in ValArray to a set of Pairs
-/*	set<Pair>s;
-	set<Pair>::iterator it = s.begin(); //iterator for our set of Pairs
-	//create the Pairs
-	for (int i = 0; i < n.currSize; i++)
-	{
-		Pair p;
-		p.element = n.contents[i];
-		p.loffset = n.child[i];
-		p.roffset = n.child[i+1];
-		s.insert(p);
-	}*/
-
+	//create a set of all contents in our contents array and add our new key to
+	//the set; this will be used to figure out which value needs to be promoted.
 	set<keyType> s (n.contents, n.contents+n.currSize);
 	s.insert(k);
 	set<keyType>::iterator it = s.begin();
-
 
 	//CREATE 3 NEW NODES FOR THE SPLIT
 	BTNode parent; //recAddr
 	parent.currSize = 0;
 
+	//used if rootAddr != recAddr
+	BTNode new_parent;	
+	
 	BTNode left_child; //oneAddr 
 	left_child.currSize = 0;
 
 	BTNode right_child; //twoAddr
 	right_child.currSize = 0;
 
-	//find the middle index, or the value that is being promoted.
+	//find the middle index, or the value that is being promoted in our set.
 	it = s.begin();
 	int middle_index = (ORDER-1)/2;
 	advance(it, middle_index);
-	Album p_album = *it;
+	keyType p_album = *it;
 	it = s.begin();
 	
 	cout << "\n\n in PlaceNode: " << endl;
@@ -361,7 +354,7 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 	//fill in the contents arrays for the parent/left_child/right_child nodes
 	for (int i = 0; i < s.size(); i++)
 	{
-		Album album = *it;
+		keyType album = *it;
 		if(album < p_album)
 		{
 			cout << "Adding " << album << " to left child." << endl;
@@ -426,29 +419,210 @@ void BTree::placeNode (keyType k,int recAddr,int oneAddr,int twoAddr)
 		int pAddr = findpAddr(album, root, rootAddr, recAddr);
 		cout << "address of node being split: " << recAddr << endl;
 		cout << "address of parent node for the node being split:" << pAddr << endl;
+
+		//get the node for the parent of the node being split.
+		BTNode split_node_parent = getNode(pAddr);
 		
+		//now, make pairs for all the elements in the contents array	
+		//add all Pairs in ValArray to a set of Pairs
+		set<Pair>s_pairs;
+		set<Pair>::iterator p_it = s_pairs.begin(); //iterator for our set of Pairs
+		
+		//create the pair for the raised node and its children
+		Pair p_raised;
+		p_raised.element = parent.contents[0];
+		p_raised.loffset = oneAddr;
+		p_raised.roffset = twoAddr;
+		s_pairs.insert(p_raised);
+		
+		cout << "RAISED NODE" << endl;
+		cout << "p_raised.element: " << p_raised.element << endl;
+		cout << "p_raised.loffset: " << p_raised.loffset << endl;
+		cout << "p_raised.roffset: " << p_raised.roffset << endl;
+		cout << endl;
+	
+		cout << "****************************************************" << endl;
+		cout << "creating the Pairs: " << endl;
+		//create the Pairs
+		for (int i = 0; i < split_node_parent.currSize; i++)
+		{
+			cout << "p_album: " << p_album << endl;
+			cout << "n.contents[i]: " << split_node_parent.contents[i] << endl;
+		
+			//if the key is supposed to be the first node inserted into the
+			//parent node, then execute this bit
+			if ((p_album < split_node_parent.contents[i]) && i == 0)
+			{
+				cout << "p_album < n.contents[i] && i == 0: " << endl;
+				cout <<  p_album << " < " << split_node_parent.contents[i] << endl;
+				//create the pair for the current thing in contents[i]
+				//with the adjusted left child offset
+				Pair p_parent;
+				cout << "Pair element: " << split_node_parent.contents[i] << endl;
+				cout << "Pair loffset: " << p_raised.roffset << endl;
+				cout << "Pair roffset: " << split_node_parent.child[i+1] << endl;
+				p_parent.element = split_node_parent.contents[i];
+				p_parent.loffset = p_raised.roffset;
+				p_parent.roffset = split_node_parent.child[i+1];
+				cout << "before insert." << endl;
+				s_pairs.insert(p_parent);
+				cout << "after insert" << endl;
+			}
+			//if the key is supposed to be the last node inserted into the parent node
+			else if ((split_node_parent.contents[i] < p_album) && i == split_node_parent.currSize)
+			{	
+				//create the pair for the current element in contents[i]
+				//while adjusting the right offset to be the same as the 
+				//left offset for the p_raised Pair	
+				Pair p_parent1;
+				p_parent1.element = split_node_parent.contents[i];
+				p_parent1.loffset = split_node_parent.child[i];
+				p_parent1.roffset = p_raised.loffset;
+				s_pairs.insert(p_parent1);	
+			}
+			else
+			{
+				//create the pair for the other elements in contents[i]
+				Pair p;
+				p.element = split_node_parent.contents[i];
+				p.loffset = split_node_parent.child[i];
+				p.roffset = split_node_parent.child[i+1];
+				s_pairs.insert(p);
+			}
+		}
+		cout << "FINISHED MAKING ALL PAIRS" << endl;
+		//if the key is being raised to the middle of the parent, then fix the right offset
+		//of the element to the left of the key. Also, fix the left offset of the element to the
+		//right of the key.
+		
+		//reset position of the Pair set iterator
+		p_it = s_pairs.begin();	
+		cout << "FINISHED RESETING ITERATOR POSITION" << endl;
+		keyType pair_key = parent.contents[0];
+		cout << "LOOKING FOR KEY IN SET OF PAIRS" << endl;
+		cout << "number of Pairs: " << s_pairs.size() << endl;
+		//find the key in the set of Pairs
+		for (int i = 0; i < s_pairs.size(); i++)
+		{
+			Pair curr_elem = *p_it;
 			
+			cout << "curr_elem: " << curr_elem.element << endl;
+			//when we find the middle key in the set of Pairs, we need to adjust the offsets 
+			//for the adjacent elements in the set of Pairs.
+			if (curr_elem.element == pair_key)
+			{
+				cout << "if curr_elem.element == pair_key: " << endl;
+				cout << "curr_elem.element: " << curr_elem.element << endl;
+				cout << "pair_key: " << pair_key << endl;
+				
+				cout << "before decrement the iterator" << endl;
+				
+				int amount_to_advance = 1;
+				if (i != 0)
+				{
+					//decrement the iterator to look at the Pair to left of current Pair
+					p_it--;
+					cout << "after decrement the iterator" << endl;
+				
+					//fix right offset of the left Pair
+					Pair left = *p_it;
+					cout << "left.element: " << left.element << endl;
+					left.roffset = curr_elem.loffset;
+	
+					//remove the thing being pointed to by the iterator so that we can add 
+					//back the new Pair with the corrected offsets to the set.
+					cout << "erasing p_it" << endl;
+					s_pairs.erase(p_it);	
+					cout << "inserting p_it" << endl;	
+					s_pairs.insert(left);
+					amount_to_advance = 2;
+				}
+				//increment the pair iterator twice so that we can point to the to the 
+				//right of the current Pair object.
+				advance(p_it, amount_to_advance);
+				
+				//fix left offset of the right Pair
+				Pair right = *p_it;
+				right.loffset = curr_elem.roffset;
+				
+				//remove the thing being pointed to by the iterator so that we can add 
+				//back the new Pair with the corrected offsets to the set.
+				s_pairs.erase(p_it);		
+				s_pairs.insert(right);
+			}
+			//increment the iterator	
+			p_it++;					
+		} 
+		/////////////////////////////////////////////////////////////////////////////////
+		//
+		//
+		//Now, the pairs have been made. Correct the parent node that's being written to the file.
+		
+		//reset position of the Pair set iterator
+		p_it = s_pairs.begin();	
+		//BTNode new_parent;	
+		new_parent.currSize = 0;
+		cout << "\n\nprinting final contents of parent node: " << endl;
+		for (int i = 0; i < s_pairs.size(); i++)
+		{
+			Pair curr_pair = *p_it;
+			new_parent.contents[i] = curr_pair.element;
+			new_parent.child[i] = curr_pair.loffset;
+			new_parent.child[i+1] = curr_pair.roffset;
+			new_parent.currSize+=1;
+			cout << new_parent.contents[i] << endl;
+			p_it++;
+		}	
+		cout << endl;
+		//update the root with the new root, if our node is a root
+		if(rootAddr == pAddr)
+		{
+			cout << "rootAddr  == pAddr" << endl;
+			root = new_parent;
+			rootAddr = pAddr;
+			cout << "\nprint rootAddr: " << endl;
+			printNode(rootAddr);
+			cout << "\nprint new_parentAddr: " << endl;
+			printNode(rootAddr);
+			cout << endl;
+			//FIX THE HEADER NODE ROOT ADDRESS
+			treeFile.seekg(0, ios::beg);
+			BTNode header1;
+			header1.child[0] = rootAddr;
+			treeFile.write((char*)&header1, sizeof(BTNode));//else, this is 
+		}
 	}
 	cout << "writing new nodes in split node" << endl;
-	//seek to the end of the file to write our new nodes there
-	treeFile.seekg(0, ios::end);	
-	oneAddr = treeFile.tellp();
-	cout << "writing left child" << endl;
-	cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
-	treeFile.write((char*) &left_child, sizeof(BTNode));
-
-	//write right_child immediately after the left_child	
-	twoAddr = treeFile.tellp();
-	cout << "writing right child" << endl;
-	cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
-	treeFile.write((char*) &right_child, sizeof(BTNode));
-
-	//move the file pointer to the parent node position
-	treeFile.seekg(recAddr);
-	cout << "writing new parent" << endl;	
-	cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
-	treeFile.write((char*) &parent, sizeof(BTNode));
-
+	if(rootAddr == recAddr)
+	{
+		//seek to the end of the file to write our new nodes there
+		treeFile.seekg(0, ios::end);	
+		oneAddr = treeFile.tellp();
+		cout << "writing left child" << endl;
+		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
+		treeFile.write((char*) &left_child, sizeof(BTNode));
+	
+		//write right_child immediately after the left_child	
+		twoAddr = treeFile.tellp();
+		cout << "writing right child" << endl;
+		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
+		treeFile.write((char*) &right_child, sizeof(BTNode));
+	
+		//move the file pointer to the parent node position
+		treeFile.seekg(recAddr);
+		cout << "writing new parent" << endl;	
+		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
+		treeFile.write((char*) &parent, sizeof(BTNode));
+	}
+	else
+	{
+		//move the file pointer to the parent node position
+		treeFile.seekg(recAddr);
+		cout << "writing new parent" << endl;	
+		cout << "new_parent.currSize: " << new_parent.currSize << endl;
+		cout << "treeFile.tellp(): " << treeFile.tellp() << endl;
+		treeFile.write((char*) &new_parent, sizeof(BTNode));
+	}
 	cout << "\n\n" << endl;
 }
 //method to determine if the current node is a leaf or not
