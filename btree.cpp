@@ -74,7 +74,7 @@ void BTree::printTree()
 //print inorder traversal of tree
 void BTree::inorder()
 {
-
+	inorder(rootAddr);	
 }
 
 //print postorder traversal of tree
@@ -134,8 +134,18 @@ void BTree::printTree (int rAddr)
 
 //print an inorder traversal of the tree
 void BTree::inorder (int rootAddr)
-{
-
+{	
+	if (rootAddr != -1)
+        {
+                BTNode dummy = getNode(rootAddr);
+                for (int i = 0;  i <= dummy.currSize;  i++)
+          	{
+	              cout << "child[i]: " << dummy.child[i] << endl;
+		      inorder(dummy.child[i]);
+		}
+        	printNode(rootAddr);
+        }
+	
 }
 //print a postorder traversal of the tree
 void BTree::reverse (int rootAddr)
