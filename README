@@ -1,3 +1,6 @@
+//This b-tree program handles normal splits, but not chain-splits.
+
+
 //Baby Readme file for Album class
 
 //below is the album.h file//
